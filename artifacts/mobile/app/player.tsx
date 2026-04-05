@@ -2,17 +2,16 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import YoutubeIframe from "react-native-youtube-iframe";
+import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -26,23 +25,19 @@ export default function PlayerScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const playerRef = useRef<YoutubeIframeRef>(null);
   const [ready, setReady] = useState(false);
 
-  // Auto-rotate to landscape when the player opens, restore on leave
+  // Lock to landscape on open, restore portrait on leave
   useEffect(() => {
     if (Platform.OS === "web") return;
-    ScreenOrientation.lockAsync(
-      ScreenOrientation.OrientationLock.LANDSCAPE
-    ).catch(() => {});
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
     return () => {
       ScreenOrientation.lockAsync(
         ScreenOrientation.OrientationLock.PORTRAIT_UP
-      ).catch(() => {});
+      );
     };
   }, []);
-
-  const onReady = useCallback(() => setReady(true), []);
 
   const handleBack = useCallback(async () => {
     if (Platform.OS !== "web") {
@@ -53,15 +48,10 @@ export default function PlayerScreen() {
     router.back();
   }, [router]);
 
-  // In landscape, width > height — fill the full screen
-  const playerWidth = Math.max(width, height);
-  const playerHeight = Math.min(width, height);
-
   return (
     <View style={styles.container}>
       <StatusBar style="light" hidden />
 
-      {/* Loading overlay */}
       {!ready && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -81,16 +71,28 @@ export default function PlayerScreen() {
         />
       ) : (
         <YoutubeIframe
+          ref={playerRef}
+          height={220}
           videoId={videoId ?? ""}
-          width={playerWidth}
-          height={playerHeight}
           play={true}
-          onReady={onReady}
+          initialPlayerParams={{
+            preventFullScreen: false,
+            rel: false,
+            modestbranding: true,
+          }}
+          onReady={() => {
+            setReady(true);
+            playerRef.current?.seekTo(0, true);
+          }}
           webViewProps={{
             userAgent: SAFARI_UA,
             allowsInlineMediaPlayback: true,
             mediaPlaybackRequiresUserAction: false,
             allowsFullscreenVideo: true,
+            injectedJavaScript: `
+              document.querySelector('video').webkitEnterFullscreen();
+              true;
+            `,
           }}
         />
       )}
@@ -100,10 +102,7 @@ export default function PlayerScreen() {
         onPress={handleBack}
         style={[
           styles.backButton,
-          {
-            top: insets.top + 8,
-            left: insets.left + 12,
-          },
+          { top: insets.top + 8, left: insets.left + 12 },
         ]}
         hitSlop={12}
       >
