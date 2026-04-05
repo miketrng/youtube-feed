@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -54,22 +53,12 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleRemove = (channel: StoredChannel) => {
-    Alert.alert(
-      "Remove Channel",
-      `Remove "${channel.title}" from your feed?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            await removeChannel(channel.id);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          },
-        },
-      ]
-    );
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const handleRemove = async (channel: StoredChannel) => {
+    await removeChannel(channel.id);
+    setConfirmingId(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   return (
@@ -158,7 +147,10 @@ export default function SettingsScreen() {
           renderItem={({ item }) => (
             <ChannelRow
               channel={item}
-              onRemove={() => handleRemove(item)}
+              confirming={confirmingId === item.id}
+              onAskRemove={() => setConfirmingId(item.id)}
+              onCancelRemove={() => setConfirmingId(null)}
+              onConfirmRemove={() => handleRemove(item)}
               colors={colors}
             />
           )}
@@ -181,25 +173,33 @@ export default function SettingsScreen() {
 
 function ChannelRow({
   channel,
-  onRemove,
+  confirming,
+  onAskRemove,
+  onCancelRemove,
+  onConfirmRemove,
   colors,
 }: {
   channel: StoredChannel;
-  onRemove: () => void;
+  confirming: boolean;
+  onAskRemove: () => void;
+  onCancelRemove: () => void;
+  onConfirmRemove: () => void;
   colors: ReturnType<typeof useColors>;
 }) {
   return (
     <View
       style={[
         styles.channelRow,
-        { backgroundColor: colors.card, borderColor: colors.border },
+        {
+          backgroundColor: confirming
+            ? colors.destructive + "18"
+            : colors.card,
+          borderColor: confirming ? colors.destructive + "55" : colors.border,
+        },
       ]}
     >
       {channel.thumbnail ? (
-        <Image
-          source={{ uri: channel.thumbnail }}
-          style={styles.channelAvatar}
-        />
+        <Image source={{ uri: channel.thumbnail }} style={styles.channelAvatar} />
       ) : (
         <View
           style={[
@@ -211,6 +211,7 @@ function ChannelRow({
           <Feather name="youtube" size={20} color={colors.mutedForeground} />
         </View>
       )}
+
       <View style={styles.channelInfo}>
         <Text
           style={[styles.channelTitle, { color: colors.foreground }]}
@@ -218,25 +219,55 @@ function ChannelRow({
         >
           {channel.title}
         </Text>
-        <Text style={[styles.channelAdded, { color: colors.mutedForeground }]}>
-          Added{" "}
-          {new Date(channel.addedAt).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </Text>
+        {confirming ? (
+          <Text style={[styles.channelAdded, { color: colors.destructive }]}>
+            Remove this channel?
+          </Text>
+        ) : (
+          <Text style={[styles.channelAdded, { color: colors.mutedForeground }]}>
+            Added{" "}
+            {new Date(channel.addedAt).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </Text>
+        )}
       </View>
-      <Pressable
-        onPress={onRemove}
-        style={({ pressed }) => [
-          styles.removeButton,
-          { opacity: pressed ? 0.6 : 1 },
-        ]}
-        hitSlop={8}
-      >
-        <Feather name="trash-2" size={18} color={colors.destructive} />
-      </Pressable>
+
+      {confirming ? (
+        <View style={styles.confirmButtons}>
+          <Pressable
+            onPress={onCancelRemove}
+            style={[styles.confirmBtn, { backgroundColor: colors.muted }]}
+            hitSlop={4}
+          >
+            <Text style={[styles.confirmBtnText, { color: colors.foreground }]}>
+              Cancel
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onConfirmRemove}
+            style={[styles.confirmBtn, { backgroundColor: colors.destructive }]}
+            hitSlop={4}
+          >
+            <Text style={[styles.confirmBtnText, { color: "#fff" }]}>
+              Remove
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          onPress={onAskRemove}
+          style={({ pressed }) => [
+            styles.removeButton,
+            { opacity: pressed ? 0.5 : 1 },
+          ]}
+          hitSlop={8}
+        >
+          <Feather name="trash-2" size={18} color={colors.destructive} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -327,6 +358,21 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: 4,
+  },
+  confirmButtons: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  confirmBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
   noChannels: {
     alignItems: "center",
