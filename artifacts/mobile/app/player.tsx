@@ -72,41 +72,70 @@ export default function PlayerScreen() {
           onLoad={() => setReady(true)}
         />
       ) : (
-        <YoutubeIframe
-          ref={playerRef}
-          height={playerHeight}
-          width={playerWidth}
-          videoId={videoId ?? ""}
-          play={true}
-          initialPlayerParams={{
-            preventFullScreen: false,
-            rel: 0,
-            modestbranding: 1,
-            controls: 1,
-          }}
-          onReady={() => setReady(true)}
-          webViewProps={{
-            allowsFullscreenVideo: true,
-            allowsInlineMediaPlayback: true,
-            mediaPlaybackRequiresUserAction: false,
-            scalesPageToFit: false,
-            bounces: false,
-            scrollEnabled: false,
-            onShouldStartLoadWithRequest: (request: ShouldStartLoadRequest) => {
-              const url = request.url;
-              // Block navigation to YouTube watch pages or app deep links
-              if (
-                url.includes("youtube.com/watch") ||
-                url.includes("youtu.be/") ||
-                url.startsWith("intent://") ||
-                url.startsWith("vnd.youtube://")
-              ) {
-                return false;
-              }
-              return true;
-            },
-          }}
-        />
+        <View style={{ position: "relative", width: playerWidth, height: playerHeight }}>
+          <YoutubeIframe
+            ref={playerRef}
+            height={playerHeight}
+            width={playerWidth}
+            videoId={videoId ?? ""}
+            play={true}
+            initialPlayerParams={{
+              preventFullScreen: false,
+              rel: 0,
+              modestbranding: 1,
+              controls: 1,
+            }}
+            onReady={() => setReady(true)}
+            webViewProps={{
+              allowsFullscreenVideo: true,
+              allowsInlineMediaPlayback: true,
+              mediaPlaybackRequiresUserAction: false,
+              scalesPageToFit: false,
+              bounces: false,
+              scrollEnabled: false,
+              onShouldStartLoadWithRequest: (request: ShouldStartLoadRequest) => {
+                const url = request.url;
+                if (
+                  url.includes("youtube.com/watch") ||
+                  url.includes("youtu.be/") ||
+                  url.startsWith("intent://") ||
+                  url.startsWith("vnd.youtube://")
+                ) {
+                  return false;
+                }
+                return true;
+              },
+            }}
+          />
+
+          {/* Block More Videos + YouTube logo (bottom right) */}
+          <Pressable
+            onPress={() => {}}
+            style={{
+              position: "absolute",
+              bottom: 0,
+              right: 0,
+              width: playerWidth * 0.45,
+              height: playerHeight * 0.32,
+              backgroundColor: "rgba(0,0,0,0.01)",
+              zIndex: 999,
+            }}
+          />
+
+          {/* Block scrubber / progress bar (bottom left + center) */}
+          <Pressable
+            onPress={() => {}}
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              width: playerWidth * 0.55,
+              height: playerHeight * 0.32,
+              backgroundColor: "rgba(0,0,0,0.01)",
+              zIndex: 999,
+            }}
+          />
+        </View>
       )}
 
       {/* Floating back button */}
