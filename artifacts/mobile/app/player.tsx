@@ -15,6 +15,13 @@ import { WebView } from "react-native-webview";
 
 import { useColors } from "@/hooks/useColors";
 
+// Spoof a real iOS Safari user agent so YouTube's embed player
+// doesn't detect "app WebView" and refuse playback (error 153).
+const SAFARI_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) " +
+  "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+  "Version/17.4 Mobile/15E148 Safari/604.1";
+
 export default function PlayerScreen() {
   const { videoId, title } = useLocalSearchParams<{
     videoId: string;
@@ -27,39 +34,9 @@ export default function PlayerScreen() {
   const [error, setError] = useState(false);
   const webRef = useRef<WebView>(null);
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
-
-  // Block any navigation away from the embed (title/logo taps try to open youtube.com/watch).
-  // Only the embed URL itself and youtube.com/* resources needed for playback are allowed.
-  const handleNavigationRequest = ({ url }: { url: string }) => {
-    if (url.includes("youtube.com/embed/")) return true;
-    if (url.includes("youtube.com/api/") || url.includes("googlevideo.com")) return true;
-    if (url.startsWith("about:") || url.startsWith("data:")) return true;
-    // Block watch pages, homepage, logo taps, etc.
-    return false;
-  };
-
-  // Neutralise clickable overlays (title, watermark) directly inside the player page.
-  const injectedJS = `
-    (function() {
-      window.open = function() { return null; };
-      function disableLinks() {
-        document.querySelectorAll(
-          '.ytp-title-link, .ytp-watermark, .ytp-youtube-button'
-        ).forEach(function(el) {
-          el.style.pointerEvents = 'none';
-          el.style.cursor = 'default';
-          el.removeAttribute('href');
-          el.removeAttribute('target');
-        });
-      }
-      disableLinks();
-      // Re-run after player fully initialises
-      setTimeout(disableLinks, 2000);
-      setTimeout(disableLinks, 5000);
-    })();
-    true;
-  `;
+  const embedUrl =
+    `https://www.youtube.com/embed/${videoId}` +
+    `?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
 
   return (
     <View style={[styles.container, { backgroundColor: "#000" }]}>
@@ -76,7 +53,10 @@ export default function PlayerScreen() {
           onPress={() => router.back()}
           style={({ pressed }) => [
             styles.backButton,
-            { opacity: pressed ? 0.6 : 1, backgroundColor: "rgba(255,255,255,0.12)" },
+            {
+              opacity: pressed ? 0.6 : 1,
+              backgroundColor: "rgba(255,255,255,0.12)",
+            },
           ]}
           hitSlop={8}
         >
@@ -85,6 +65,7 @@ export default function PlayerScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {title ?? ""}
         </Text>
+        {/* Spacer to keep title centred */}
         <View style={styles.backButton} />
       </View>
 
@@ -112,13 +93,13 @@ export default function PlayerScreen() {
                 <ActivityIndicator size="large" color={colors.primary} />
               </View>
             )}
+
             {Platform.OS === "web" ? (
               <iframe
                 src={embedUrl}
                 style={{ width: "100%", height: "100%", border: "none" }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen allow-presentation"
                 onLoad={() => setLoading(false)}
               />
             ) : (
@@ -126,20 +107,15 @@ export default function PlayerScreen() {
                 ref={webRef}
                 source={{ uri: embedUrl }}
                 style={styles.webview}
+                userAgent={SAFARI_UA}
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}
                 allowsFullscreenVideo
                 javaScriptEnabled
                 domStorageEnabled
-                injectedJavaScript={injectedJS}
-                onShouldStartLoadWithRequest={handleNavigationRequest}
-                originWhitelist={["https://www.youtube.com", "https://*.youtube.com", "https://*.googlevideo.com"]}
+                originWhitelist={["*"]}
                 onLoadEnd={() => setLoading(false)}
                 onError={() => {
-                  setLoading(false);
-                  setError(true);
-                }}
-                onHttpError={() => {
                   setLoading(false);
                   setError(true);
                 }}
