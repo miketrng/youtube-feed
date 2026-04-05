@@ -25,6 +25,9 @@ export default function PlayerScreen() {
   const insets = useSafeAreaInsets();
   const playerRef = useRef<YoutubeIframeRef>(null);
   const { width, height } = useWindowDimensions();
+  // Constrain to 16:9 so the player isn't stretched/zoomed on wide screens
+  const playerWidth = Math.min(width, height * (16 / 9));
+  const playerHeight = Math.min(height, width * (9 / 16));
   const [ready, setReady] = useState(false);
 
   // Lock to landscape on open, restore portrait on leave
@@ -71,8 +74,8 @@ export default function PlayerScreen() {
       ) : (
         <YoutubeIframe
           ref={playerRef}
-          height={height}
-          width={width}
+          height={playerHeight}
+          width={playerWidth}
           videoId={videoId ?? ""}
           play={true}
           initialPlayerParams={{
