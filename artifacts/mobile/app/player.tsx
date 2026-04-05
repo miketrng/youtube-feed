@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,10 +16,6 @@ import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
 
 import { useColors } from "@/hooks/useColors";
 
-const SAFARI_UA =
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) " +
-  "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
-  "Version/17.4 Mobile/15E148 Safari/604.1";
 
 export default function PlayerScreen() {
   const { videoId } = useLocalSearchParams<{ videoId: string }>();
@@ -72,27 +69,21 @@ export default function PlayerScreen() {
       ) : (
         <YoutubeIframe
           ref={playerRef}
-          height={220}
+          height={Dimensions.get("window").height}
+          width={Dimensions.get("window").width}
           videoId={videoId ?? ""}
           play={true}
           initialPlayerParams={{
             preventFullScreen: false,
-            rel: false,
-            modestbranding: true,
+            rel: 0,
+            modestbranding: 1,
+            controls: 1,
           }}
-          onReady={() => {
-            setReady(true);
-            playerRef.current?.seekTo(0, true);
-          }}
+          onReady={() => setReady(true)}
           webViewProps={{
-            userAgent: SAFARI_UA,
-            allowsInlineMediaPlayback: true,
-            mediaPlaybackRequiresUserAction: false,
             allowsFullscreenVideo: true,
-            injectedJavaScript: `
-              document.querySelector('video').webkitEnterFullscreen();
-              true;
-            `,
+            allowsInlineMediaPlayback: false,
+            mediaPlaybackRequiresUserAction: false,
           }}
         />
       )}
