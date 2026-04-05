@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -10,11 +10,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WebView } from "react-native-webview";
+import YoutubeIframe from "react-native-youtube-iframe";
 
 import { useColors } from "@/hooks/useColors";
 
-// Spoof Safari so YouTube embed doesn't detect app WebView (error 153).
+// Safari UA used only for the web fallback iframe
 const SAFARI_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) " +
   "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
@@ -25,78 +25,54 @@ export default function PlayerScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const webRef = useRef<WebView>(null);
+  const [ready, setReady] = useState(false);
 
-  const embedUrl =
-    `https://www.youtube.com/embed/${videoId}` +
-    `?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+  const onReady = useCallback(() => setReady(true), []);
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Full-screen video */}
-      {error ? (
-        <View style={[styles.errorContainer, { backgroundColor: "#000" }]}>
-          <Feather name="alert-circle" size={40} color="#909090" />
-          <Pressable
-            onPress={() => {
-              setError(false);
-              setLoading(true);
-              webRef.current?.reload();
+      {/* Video fills the screen */}
+      <View style={styles.playerWrapper}>
+        {!ready && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        )}
+
+        {Platform.OS === "web" ? (
+          // Web fallback: plain iframe (works in browser preview)
+          <iframe
+            src={
+              `https://www.youtube.com/embed/${videoId}` +
+              `?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+            }
+            style={{ width: "100%", height: "100%", border: "none" }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            onLoad={() => setReady(true)}
+          />
+        ) : (
+          <YoutubeIframe
+            videoId={videoId ?? ""}
+            height={300}
+            play={true}
+            onReady={onReady}
+            webViewStyle={styles.webview}
+            webViewProps={{
+              userAgent: SAFARI_UA,
+              allowsInlineMediaPlayback: true,
+              mediaPlaybackRequiresUserAction: false,
             }}
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="refresh-cw" size={16} color="#fff" />
-          </Pressable>
-        </View>
-      ) : (
-        <>
-          {loading && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          )}
+          />
+        )}
+      </View>
 
-          {Platform.OS === "web" ? (
-            <iframe
-              src={embedUrl}
-              style={{ width: "100%", height: "100%", border: "none" }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              onLoad={() => setLoading(false)}
-            />
-          ) : (
-            <WebView
-              ref={webRef}
-              source={{ uri: embedUrl }}
-              style={styles.webview}
-              userAgent={SAFARI_UA}
-              allowsInlineMediaPlayback
-              mediaPlaybackRequiresUserAction={false}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
-              originWhitelist={["*"]}
-              onLoadEnd={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError(true);
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {/* Floating back button — top-left over the video */}
+      {/* Floating back button */}
       <Pressable
         onPress={() => router.back()}
-        style={[
-          styles.backButton,
-          { top: insets.top + 12 },
-        ]}
+        style={[styles.backButton, { top: insets.top + 12 }]}
         hitSlop={12}
       >
         <Feather name="arrow-left" size={20} color="#fff" />
@@ -110,8 +86,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  webview: {
+  playerWrapper: {
     flex: 1,
+    justifyContent: "center",
+  },
+  webview: {
     backgroundColor: "#000",
   },
   loadingOverlay: {
@@ -131,18 +110,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 20,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-  },
-  retryButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

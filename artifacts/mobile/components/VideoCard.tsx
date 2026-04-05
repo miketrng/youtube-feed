@@ -1,10 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -22,26 +20,11 @@ export function VideoCard({ video }: VideoCardProps) {
   const colors = useColors();
   const router = useRouter();
 
-  const handlePress = async () => {
-    if (Platform.OS === "web") {
-      // Canvas/browser preview — use the in-app WebView player
-      router.push({
-        pathname: "/player",
-        params: { videoId: video.id, title: video.title },
-      });
-    } else {
-      // iOS / Android — open in SFSafariViewController (real Safari engine).
-      // YouTube cannot detect this as an app WebView, so error 153 never occurs.
-      await WebBrowser.openBrowserAsync(
-        `https://www.youtube.com/watch?v=${video.id}`,
-        {
-          presentationStyle:
-            WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-          toolbarColor: "#000000",
-          controlsColor: "#FF0000",
-        }
-      );
-    }
+  const handlePress = () => {
+    router.push({
+      pathname: "/player",
+      params: { videoId: video.id, title: video.title },
+    });
   };
 
   return (
@@ -72,10 +55,7 @@ export function VideoCard({ video }: VideoCardProps) {
         )}
         <View style={styles.playOverlay}>
           <View
-            style={[
-              styles.playButton,
-              { backgroundColor: "rgba(0,0,0,0.7)" },
-            ]}
+            style={[styles.playButton, { backgroundColor: "rgba(0,0,0,0.7)" }]}
           >
             <Feather name="play" size={18} color="#fff" />
           </View>
@@ -96,9 +76,7 @@ export function VideoCard({ video }: VideoCardProps) {
           >
             {video.channelTitle}
           </Text>
-          <Text style={[styles.dot, { color: colors.mutedForeground }]}>
-            •
-          </Text>
+          <Text style={[styles.dot, { color: colors.mutedForeground }]}>•</Text>
           <Text style={[styles.date, { color: colors.mutedForeground }]}>
             {formatRelativeTime(video.publishedAt)}
           </Text>
