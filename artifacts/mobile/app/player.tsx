@@ -87,7 +87,6 @@ export default function PlayerScreen() {
           src="${embedUrl}"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
-          sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen allow-presentation"
         ></iframe>
       </div>
     </body>
