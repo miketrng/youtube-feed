@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
+import { useChannels } from "@/context/ChannelsContext";
 import { useColors } from "@/hooks/useColors";
 
 
@@ -24,6 +25,7 @@ export default function PlayerScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const playerRef = useRef<YoutubeIframeRef>(null);
+  const { focusMode } = useChannels();
   const { width, height } = useWindowDimensions();
   // Constrain to 16:9 so the player isn't stretched/zoomed on wide screens
   const playerWidth = Math.min(width, height * (16 / 9));
@@ -108,33 +110,37 @@ export default function PlayerScreen() {
             }}
           />
 
-          {/* Block More Videos + YouTube logo (bottom right) */}
-          <Pressable
-            onPress={() => {}}
-            style={{
-              position: "absolute",
-              bottom: 0,
-              right: 0,
-              width: playerWidth * 0.45,
-              height: playerHeight * 0.32,
-              backgroundColor: "rgba(0,0,0,0.01)",
-              zIndex: 999,
-            }}
-          />
+          {focusMode && (
+            <>
+              {/* Block More Videos + YouTube logo (bottom right) */}
+              <Pressable
+                onPress={() => {}}
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  right: 0,
+                  width: playerWidth * 0.45,
+                  height: playerHeight * 0.32,
+                  backgroundColor: "rgba(0,0,0,0.01)",
+                  zIndex: 999,
+                }}
+              />
 
-          {/* Block scrubber / progress bar (bottom left + center) */}
-          <Pressable
-            onPress={() => {}}
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              width: playerWidth * 0.55,
-              height: playerHeight * 0.32,
-              backgroundColor: "rgba(0,0,0,0.01)",
-              zIndex: 999,
-            }}
-          />
+              {/* Block scrubber / progress bar (bottom left + center) */}
+              <Pressable
+                onPress={() => {}}
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  width: playerWidth * 0.55,
+                  height: playerHeight * 0.32,
+                  backgroundColor: "rgba(0,0,0,0.01)",
+                  zIndex: 999,
+                }}
+              />
+            </>
+          )}
         </View>
       )}
 

@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -21,7 +22,7 @@ import { StoredChannel, resolveChannelFromUrl } from "@/services/youtube";
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { channels, addChannel, removeChannel } = useChannels();
+  const { channels, addChannel, removeChannel, focusMode, toggleFocusMode } = useChannels();
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +69,27 @@ export default function SettingsScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <View style={styles.container}>
+        {/* Focus Mode */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+            PLAYBACK
+          </Text>
+          <View style={[styles.focusRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.focusText}>
+              <Text style={[styles.focusTitle, { color: colors.foreground }]}>Focus Mode</Text>
+              <Text style={[styles.focusSub, { color: colors.mutedForeground }]}>
+                Hides YouTube controls and related videos
+              </Text>
+            </View>
+            <Switch
+              value={focusMode}
+              onValueChange={toggleFocusMode}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
         {/* Add Channel Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
@@ -383,5 +405,25 @@ const styles = StyleSheet.create({
   noChannelsText: {
     fontSize: 14,
     textAlign: "center",
+  },
+  focusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  focusText: {
+    flex: 1,
+    gap: 3,
+  },
+  focusTitle: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
+  focusSub: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

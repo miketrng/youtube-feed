@@ -15,6 +15,7 @@ import {
 } from "@/services/youtube";
 
 const STORAGE_KEY = "@curated_yt_channels";
+const PREFS_KEY = "@curated_yt_preferences";
 
 interface ChannelsContextValue {
   channels: StoredChannel[];
@@ -23,10 +24,12 @@ interface ChannelsContextValue {
   refreshing: boolean;
   loadingMore: boolean;
   hasMore: boolean;
+  focusMode: boolean;
   addChannel: (channel: StoredChannel) => Promise<void>;
   removeChannel: (channelId: string) => Promise<void>;
   refresh: () => Promise<void>;
   loadMore: () => Promise<void>;
+  toggleFocusMode: () => void;
 }
 
 const ChannelsContext = createContext<ChannelsContextValue | null>(null);
@@ -43,6 +46,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [focusMode, setFocusMode] = useState(true);
 
   // nextPageToken per uploadsPlaylistId
   const pageTokensRef = useRef<Record<string, string | undefined>>({});
@@ -82,11 +86,26 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem(PREFS_KEY, JSON.stringify({ focusMode: next })).catch(() => {});
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       const chs = await loadChannels();
       await fetchAllVideos(chs);
+      try {
+        const rawPrefs = await AsyncStorage.getItem(PREFS_KEY);
+        if (rawPrefs) {
+          const prefs = JSON.parse(rawPrefs);
+          if (prefs.focusMode !== undefined) setFocusMode(prefs.focusMode);
+        }
+      } catch {}
       setLoading(false);
     })();
   }, [loadChannels, fetchAllVideos]);
@@ -170,10 +189,12 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
         refreshing,
         loadingMore,
         hasMore,
+        focusMode,
         addChannel,
         removeChannel,
         refresh,
         loadMore,
+        toggleFocusMode,
       }}
     >
       {children}
