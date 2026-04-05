@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
+  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -18,7 +19,8 @@ import { Video } from "@/services/youtube";
 
 export default function FeedScreen() {
   const colors = useColors();
-  const { videos, loading, refreshing, refresh, channels } = useChannels();
+  const { videos, loading, refreshing, refresh, channels, loadMore, loadingMore } =
+    useChannels();
   const router = useRouter();
 
   if (loading) {
@@ -37,13 +39,7 @@ export default function FeedScreen() {
 
   if (channels.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          styles.empty,
-          { backgroundColor: colors.background },
-        ]}
-      >
+      <View style={[styles.container, styles.empty, { backgroundColor: colors.background }]}>
         <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
           <Feather name="youtube" size={40} color={colors.primary} />
         </View>
@@ -67,13 +63,7 @@ export default function FeedScreen() {
 
   if (videos.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          styles.empty,
-          { backgroundColor: colors.background },
-        ]}
-      >
+      <View style={[styles.container, styles.empty, { backgroundColor: colors.background }]}>
         <Feather name="inbox" size={40} color={colors.mutedForeground} />
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
           No videos found
@@ -93,6 +83,15 @@ export default function FeedScreen() {
         renderItem={({ item }) => <VideoCard video={item} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -107,13 +106,8 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  list: {
-    padding: 16,
-    paddingBottom: 100,
-  },
+  container: { flex: 1 },
+  list: { padding: 16, paddingBottom: 100 },
   empty: {
     flex: 1,
     alignItems: "center",
@@ -129,16 +123,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 8,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700" as const,
-    textAlign: "center",
-  },
-  emptyBody: {
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 22,
-  },
+  emptyTitle: { fontSize: 20, fontWeight: "700" as const, textAlign: "center" },
+  emptyBody: { fontSize: 14, textAlign: "center", lineHeight: 22 },
   emptyButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -148,9 +134,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     marginTop: 8,
   },
-  emptyButtonText: {
-    color: "#fff",
-    fontWeight: "600" as const,
-    fontSize: 15,
-  },
+  emptyButtonText: { color: "#fff", fontWeight: "600" as const, fontSize: 15 },
+  footer: { paddingVertical: 24, alignItems: "center" },
 });

@@ -47,15 +47,17 @@ router.get("/youtube/search", async (req, res) => {
   }
 });
 
-// Proxy: playlist items (uploads)
+// Proxy: playlist items (uploads) — supports pageToken for pagination
 router.get("/youtube/playlistItems", async (req, res) => {
   try {
-    const { playlistId, maxResults, part } = req.query as Record<string, string>;
-    const data = await ytFetch("playlistItems", {
+    const { playlistId, maxResults, part, pageToken } = req.query as Record<string, string>;
+    const params: Record<string, string> = {
       part: part ?? "snippet",
       playlistId,
-      maxResults: maxResults ?? "20",
-    });
+      maxResults: maxResults ?? "15",
+    };
+    if (pageToken) params.pageToken = pageToken;
+    const data = await ytFetch("playlistItems", params);
     res.json(data);
   } catch (e: any) {
     res.status(500).json({ error: e.message });

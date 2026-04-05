@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,18 +14,14 @@ import { WebView } from "react-native-webview";
 
 import { useColors } from "@/hooks/useColors";
 
-// Spoof a real iOS Safari user agent so YouTube's embed player
-// doesn't detect "app WebView" and refuse playback (error 153).
+// Spoof Safari so YouTube embed doesn't detect app WebView (error 153).
 const SAFARI_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) " +
   "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
   "Version/17.4 Mobile/15E148 Safari/604.1";
 
 export default function PlayerScreen() {
-  const { videoId, title } = useLocalSearchParams<{
-    videoId: string;
-    title: string;
-  }>();
+  const { videoId } = useLocalSearchParams<{ videoId: string }>();
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -39,94 +34,73 @@ export default function PlayerScreen() {
     `?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
 
   return (
-    <View style={[styles.container, { backgroundColor: "#000" }]}>
+    <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + 8, backgroundColor: "#000" },
-        ]}
-      >
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [
-            styles.backButton,
-            {
-              opacity: pressed ? 0.6 : 1,
-              backgroundColor: "rgba(255,255,255,0.12)",
-            },
-          ]}
-          hitSlop={8}
-        >
-          <Feather name="x" size={20} color="#fff" />
-        </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {title ?? ""}
-        </Text>
-        {/* Spacer to keep title centred */}
-        <View style={styles.backButton} />
-      </View>
+      {/* Full-screen video */}
+      {error ? (
+        <View style={[styles.errorContainer, { backgroundColor: "#000" }]}>
+          <Feather name="alert-circle" size={40} color="#909090" />
+          <Pressable
+            onPress={() => {
+              setError(false);
+              setLoading(true);
+              webRef.current?.reload();
+            }}
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          >
+            <Feather name="refresh-cw" size={16} color="#fff" />
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          )}
 
-      {/* Video player */}
-      <View style={styles.playerWrapper}>
-        {error ? (
-          <View style={styles.errorContainer}>
-            <Feather name="alert-circle" size={40} color="#909090" />
-            <Text style={styles.errorText}>Unable to load video</Text>
-            <Pressable
-              onPress={() => {
-                setError(false);
-                setLoading(true);
-                webRef.current?.reload();
+          {Platform.OS === "web" ? (
+            <iframe
+              src={embedUrl}
+              style={{ width: "100%", height: "100%", border: "none" }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              onLoad={() => setLoading(false)}
+            />
+          ) : (
+            <WebView
+              ref={webRef}
+              source={{ uri: embedUrl }}
+              style={styles.webview}
+              userAgent={SAFARI_UA}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+              originWhitelist={["*"]}
+              onLoadEnd={() => setLoading(false)}
+              onError={() => {
+                setLoading(false);
+                setError(true);
               }}
-              style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            {loading && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            )}
+            />
+          )}
+        </>
+      )}
 
-            {Platform.OS === "web" ? (
-              <iframe
-                src={embedUrl}
-                style={{ width: "100%", height: "100%", border: "none" }}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                onLoad={() => setLoading(false)}
-              />
-            ) : (
-              <WebView
-                ref={webRef}
-                source={{ uri: embedUrl }}
-                style={styles.webview}
-                userAgent={SAFARI_UA}
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-                allowsFullscreenVideo
-                javaScriptEnabled
-                domStorageEnabled
-                originWhitelist={["*"]}
-                onLoadEnd={() => setLoading(false)}
-                onError={() => {
-                  setLoading(false);
-                  setError(true);
-                }}
-              />
-            )}
-          </>
-        )}
-      </View>
-
-      {/* Bottom safe area */}
-      <View style={{ height: insets.bottom, backgroundColor: "#000" }} />
+      {/* Floating back button — top-left over the video */}
+      <Pressable
+        onPress={() => router.back()}
+        style={[
+          styles.backButton,
+          { top: insets.top + 12 },
+        ]}
+        hitSlop={12}
+      >
+        <Feather name="arrow-left" size={20} color="#fff" />
+      </Pressable>
     </View>
   );
 }
@@ -134,31 +108,7 @@ export default function PlayerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600" as const,
-    textAlign: "center",
-  },
-  playerWrapper: {
-    flex: 1,
-    position: "relative",
+    backgroundColor: "#000",
   },
   webview: {
     flex: 1,
@@ -171,23 +121,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     zIndex: 10,
   },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+  },
   errorContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
-  },
-  errorText: {
-    color: "#909090",
-    fontSize: 16,
+    gap: 20,
   },
   retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  retryButtonText: {
-    color: "#fff",
-    fontWeight: "600" as const,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
