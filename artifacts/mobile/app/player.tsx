@@ -29,68 +29,36 @@ export default function PlayerScreen() {
 
   const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
 
-  // Intercept any top-level navigation attempt inside the WebView.
-  // YouTube's title and logo buttons try to navigate window.top to youtube.com/watch —
-  // returning false here blocks that entirely.
+  // Block any navigation away from the embed (title/logo taps try to open youtube.com/watch).
+  // Only the embed URL itself and youtube.com/* resources needed for playback are allowed.
   const handleNavigationRequest = ({ url }: { url: string }) => {
-    if (url === "about:blank") return true;
-    if (url.startsWith("data:")) return true;
     if (url.includes("youtube.com/embed/")) return true;
-    // Block everything else (youtube.com/watch, youtu.be, etc.)
+    if (url.includes("youtube.com/api/") || url.includes("googlevideo.com")) return true;
+    if (url.startsWith("about:") || url.startsWith("data:")) return true;
+    // Block watch pages, homepage, logo taps, etc.
     return false;
   };
 
-  // JavaScript injected into the WebView host page to neutralise the
-  // clickable overlays inside the YouTube iframe via postMessage trickery
-  // and by overriding window.open / anchor handling at the host level.
+  // Neutralise clickable overlays (title, watermark) directly inside the player page.
   const injectedJS = `
     (function() {
-      // Prevent window.open calls (some embeds use this instead of navigation)
       window.open = function() { return null; };
-      // Intercept all anchor clicks at the document level
-      document.addEventListener('click', function(e) {
-        var el = e.target;
-        while (el && el.tagName !== 'A') el = el.parentElement;
-        if (el && el.tagName === 'A') { e.preventDefault(); e.stopPropagation(); }
-      }, true);
+      function disableLinks() {
+        document.querySelectorAll(
+          '.ytp-title-link, .ytp-watermark, .ytp-youtube-button'
+        ).forEach(function(el) {
+          el.style.pointerEvents = 'none';
+          el.style.cursor = 'default';
+          el.removeAttribute('href');
+          el.removeAttribute('target');
+        });
+      }
+      disableLinks();
+      // Re-run after player fully initialises
+      setTimeout(disableLinks, 2000);
+      setTimeout(disableLinks, 5000);
     })();
     true;
-  `;
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { background: #000; width: 100%; height: 100%; overflow: hidden; }
-        .container { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
-        iframe { width: 100%; height: 100%; border: none; }
-        /* Disable pointer events on the YouTube logo / title overlays.
-           These selectors target the known elements in the embed player. */
-        .ytp-watermark,
-        .ytp-youtube-button,
-        .ytp-title,
-        .ytp-title-text,
-        .ytp-title-link {
-          pointer-events: none !important;
-          cursor: default !important;
-        }
-        /* Remove underline from title links to signal they're non-interactive */
-        .ytp-title-link { text-decoration: none !important; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <iframe
-          src="${embedUrl}"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen
-        ></iframe>
-      </div>
-    </body>
-    </html>
   `;
 
   return (
@@ -156,7 +124,7 @@ export default function PlayerScreen() {
             ) : (
               <WebView
                 ref={webRef}
-                source={{ html }}
+                source={{ uri: embedUrl }}
                 style={styles.webview}
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}
@@ -165,6 +133,7 @@ export default function PlayerScreen() {
                 domStorageEnabled
                 injectedJavaScript={injectedJS}
                 onShouldStartLoadWithRequest={handleNavigationRequest}
+                originWhitelist={["https://www.youtube.com", "https://*.youtube.com", "https://*.googlevideo.com"]}
                 onLoadEnd={() => setLoading(false)}
                 onError={() => {
                   setLoading(false);
