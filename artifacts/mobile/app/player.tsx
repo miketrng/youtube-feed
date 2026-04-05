@@ -86,6 +86,9 @@ export default function PlayerScreen() {
             allowsFullscreenVideo: true,
             allowsInlineMediaPlayback: true,
             mediaPlaybackRequiresUserAction: false,
+            scalesPageToFit: false,
+            bounces: false,
+            scrollEnabled: false,
             onShouldStartLoadWithRequest: (request: ShouldStartLoadRequest) => {
               const url = request.url;
               // Block navigation to YouTube watch pages or app deep links
