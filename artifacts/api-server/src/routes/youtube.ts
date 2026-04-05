@@ -2,14 +2,14 @@ import { Router } from "express";
 
 const router = Router();
 
-const YT_API_KEY = process.env["YOUTUBE_API_KEY"];
 const YT_BASE = "https://www.googleapis.com/youtube/v3";
 
 async function ytFetch(endpoint: string, params: Record<string, string>) {
-  if (!YT_API_KEY) {
+  const ytApiKey = process.env["YOUTUBE_API_KEY"];
+  if (!ytApiKey) {
     throw new Error("YOUTUBE_API_KEY is not configured");
   }
-  const query = new URLSearchParams({ ...params, key: YT_API_KEY }).toString();
+  const query = new URLSearchParams({ ...params, key: ytApiKey }).toString();
   const url = `${YT_BASE}/${endpoint}?${query}`;
   const res = await fetch(url);
   const data = await res.json();

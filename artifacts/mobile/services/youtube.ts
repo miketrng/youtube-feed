@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 export interface Channel {
   id: string;
   title: string;
@@ -27,22 +29,54 @@ export interface PlaylistPage {
   nextPageToken?: string;
 }
 
+/** Full origin of the API server, e.g. `http://192.168.1.42:3000` (no trailing slash). */
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+/** Deployed host (e.g. Replit); uses https. */
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 
-function apiUrl(path: string) {
-  if (DOMAIN) {
-    return `https://${DOMAIN}/api${path}`;
+const MISSING_API_MSG =
+  "Missing API URL. For Expo Go on a phone, start the api-server and set EXPO_PUBLIC_API_BASE_URL in artifacts/mobile/.env (e.g. http://YOUR_LAN_IP:PORT). Same Wi‑Fi as the phone. Server needs YOUTUBE_API_KEY.";
+
+function apiUrl(path: string): string {
+  const suffix = `/api${path}`;
+  if (API_BASE_URL) {
+    return `${API_BASE_URL.replace(/\/$/, "")}${suffix}`;
   }
-  return `/api${path}`;
+  if (DOMAIN) {
+    const host = DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${host}${suffix}`;
+  }
+  if (Platform.OS === "web") {
+    return suffix;
+  }
+  throw new Error(MISSING_API_MSG);
 }
 
-async function apiFetch(path: string, params: Record<string, string>): Promise<any> {
+async function parseJsonBody(res: Response): Promise<unknown> {
+  const text = await res.text();
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("<")) {
+    throw new Error(
+      "Got HTML instead of JSON — the app is not talking to the YouTube API server. " + MISSING_API_MSG,
+    );
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      `Invalid JSON from API (${res.status}): ${text.slice(0, 120)}${text.length > 120 ? "…" : ""}`,
+    );
+  }
+}
+
+async function apiFetch(path: string, params: Record<string, string>): Promise<Record<string, unknown>> {
   const query = new URLSearchParams(params).toString();
   const url = `${apiUrl(path)}?${query}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = (await parseJsonBody(res)) as Record<string, unknown>;
   if (!res.ok) {
-    throw new Error(data?.error ?? `API error ${res.status}`);
+    const err = typeof data.error === "string" ? data.error : `API error ${res.status}`;
+    throw new Error(err);
   }
   return data;
 }
@@ -60,19 +94,31 @@ export async function resolveChannelFromUrl(inputUrl: string): Promise<Channel> 
   }
   if (handleMatch) {
     const data = await apiFetch("/youtube/search", { q: `@${handleMatch[1]}`, type: "channel", maxResults: "1" });
-    if (!data.items?.length) throw new Error("Channel not found");
-    return fetchChannelById(data.items[0].snippet.channelId);
+    const items = data.items;
+    if (!Array.isArray(items) || items.length === 0) throw new Error("Channel not found");
+    const first = items[0] as { snippet?: { channelId?: string } };
+    const id = first.snippet?.channelId;
+    if (!id) throw new Error("Channel not found");
+    return fetchChannelById(id);
   }
   if (customUrlMatch || userMatch) {
     const name = (customUrlMatch?.[1] ?? userMatch?.[1]) as string;
     const data = await apiFetch("/youtube/search", { q: name, type: "channel", maxResults: "1" });
-    if (!data.items?.length) throw new Error("Channel not found");
-    return fetchChannelById(data.items[0].snippet.channelId);
+    const items = data.items;
+    if (!Array.isArray(items) || items.length === 0) throw new Error("Channel not found");
+    const first = items[0] as { snippet?: { channelId?: string } };
+    const id = first.snippet?.channelId;
+    if (!id) throw new Error("Channel not found");
+    return fetchChannelById(id);
   }
   if (!trimmed.startsWith("http")) {
     const data = await apiFetch("/youtube/search", { q: trimmed, type: "channel", maxResults: "1" });
-    if (!data.items?.length) throw new Error("Channel not found");
-    return fetchChannelById(data.items[0].snippet.channelId);
+    const items = data.items;
+    if (!Array.isArray(items) || items.length === 0) throw new Error("Channel not found");
+    const first = items[0] as { snippet?: { channelId?: string } };
+    const id = first.snippet?.channelId;
+    if (!id) throw new Error("Channel not found");
+    return fetchChannelById(id);
   }
 
   throw new Error("Could not parse channel URL. Try pasting the full URL (e.g. youtube.com/@handle).");
@@ -80,8 +126,13 @@ export async function resolveChannelFromUrl(inputUrl: string): Promise<Channel> 
 
 async function fetchChannelById(channelId: string): Promise<Channel> {
   const data = await apiFetch("/youtube/channels", { id: channelId, part: "snippet,contentDetails" });
-  if (!data.items?.length) throw new Error("Channel not found");
-  const ch = data.items[0];
+  const items = data.items;
+  if (!Array.isArray(items) || items.length === 0) throw new Error("Channel not found");
+  const ch = items[0] as {
+    id: string;
+    snippet: { title: string; thumbnails?: { high?: { url?: string }; default?: { url?: string } } };
+    contentDetails: { relatedPlaylists: { uploads: string } };
+  };
   return {
     id: ch.id,
     title: ch.snippet.title,
@@ -103,20 +154,37 @@ export async function fetchVideosFromPlaylist(
 
   const data = await apiFetch("/youtube/playlistItems", params);
 
-  const videos: Video[] = (data.items ?? []).map((item: any) => ({
-    id: item.snippet.resourceId.videoId,
-    title: item.snippet.title,
-    channelId: item.snippet.channelId ?? "",
-    channelTitle: item.snippet.channelTitle ?? item.snippet.videoOwnerChannelTitle ?? "",
-    thumbnail:
-      item.snippet.thumbnails?.high?.url ??
-      item.snippet.thumbnails?.medium?.url ??
-      item.snippet.thumbnails?.default?.url ??
-      "",
-    publishedAt: item.snippet.publishedAt,
-  }));
+  const rawItems = data.items;
+  const items = Array.isArray(rawItems) ? rawItems : [];
 
-  return { videos, nextPageToken: data.nextPageToken };
+  const videos: Video[] = items.map((item: unknown) => {
+    const row = item as {
+      snippet: {
+        resourceId: { videoId: string };
+        title: string;
+        channelId?: string;
+        channelTitle?: string;
+        videoOwnerChannelTitle?: string;
+        thumbnails?: { high?: { url?: string }; medium?: { url?: string }; default?: { url?: string } };
+        publishedAt: string;
+      };
+    };
+    return {
+      id: row.snippet.resourceId.videoId,
+      title: row.snippet.title,
+      channelId: row.snippet.channelId ?? "",
+      channelTitle: row.snippet.channelTitle ?? row.snippet.videoOwnerChannelTitle ?? "",
+      thumbnail:
+        row.snippet.thumbnails?.high?.url ??
+        row.snippet.thumbnails?.medium?.url ??
+        row.snippet.thumbnails?.default?.url ??
+        "",
+      publishedAt: row.snippet.publishedAt,
+    };
+  });
+
+  const next = data.nextPageToken;
+  return { videos, nextPageToken: typeof next === "string" ? next : undefined };
 }
 
 export function formatRelativeTime(isoDate: string): string {
