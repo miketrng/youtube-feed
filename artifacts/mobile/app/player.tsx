@@ -29,6 +29,34 @@ export default function PlayerScreen() {
 
   const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
 
+  // Intercept any top-level navigation attempt inside the WebView.
+  // YouTube's title and logo buttons try to navigate window.top to youtube.com/watch —
+  // returning false here blocks that entirely.
+  const handleNavigationRequest = ({ url }: { url: string }) => {
+    if (url === "about:blank") return true;
+    if (url.startsWith("data:")) return true;
+    if (url.includes("youtube.com/embed/")) return true;
+    // Block everything else (youtube.com/watch, youtu.be, etc.)
+    return false;
+  };
+
+  // JavaScript injected into the WebView host page to neutralise the
+  // clickable overlays inside the YouTube iframe via postMessage trickery
+  // and by overriding window.open / anchor handling at the host level.
+  const injectedJS = `
+    (function() {
+      // Prevent window.open calls (some embeds use this instead of navigation)
+      window.open = function() { return null; };
+      // Intercept all anchor clicks at the document level
+      document.addEventListener('click', function(e) {
+        var el = e.target;
+        while (el && el.tagName !== 'A') el = el.parentElement;
+        if (el && el.tagName === 'A') { e.preventDefault(); e.stopPropagation(); }
+      }, true);
+    })();
+    true;
+  `;
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -39,6 +67,18 @@ export default function PlayerScreen() {
         html, body { background: #000; width: 100%; height: 100%; overflow: hidden; }
         .container { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
         iframe { width: 100%; height: 100%; border: none; }
+        /* Disable pointer events on the YouTube logo / title overlays.
+           These selectors target the known elements in the embed player. */
+        .ytp-watermark,
+        .ytp-youtube-button,
+        .ytp-title,
+        .ytp-title-text,
+        .ytp-title-link {
+          pointer-events: none !important;
+          cursor: default !important;
+        }
+        /* Remove underline from title links to signal they're non-interactive */
+        .ytp-title-link { text-decoration: none !important; }
       </style>
     </head>
     <body>
@@ -122,6 +162,8 @@ export default function PlayerScreen() {
                 allowsFullscreenVideo
                 javaScriptEnabled
                 domStorageEnabled
+                injectedJavaScript={injectedJS}
+                onShouldStartLoadWithRequest={handleNavigationRequest}
                 onLoadEnd={() => setLoading(false)}
                 onError={() => {
                   setLoading(false);
