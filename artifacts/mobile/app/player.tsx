@@ -5,11 +5,11 @@ import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Platform,
   Pressable,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
@@ -23,6 +23,7 @@ export default function PlayerScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const playerRef = useRef<YoutubeIframeRef>(null);
+  const { width, height } = useWindowDimensions();
   const [ready, setReady] = useState(false);
 
   // Lock to landscape on open, restore portrait on leave
@@ -69,8 +70,8 @@ export default function PlayerScreen() {
       ) : (
         <YoutubeIframe
           ref={playerRef}
-          height={Dimensions.get("window").height}
-          width={Dimensions.get("window").width}
+          height={height}
+          width={width}
           videoId={videoId ?? ""}
           play={true}
           initialPlayerParams={{
@@ -82,7 +83,7 @@ export default function PlayerScreen() {
           onReady={() => setReady(true)}
           webViewProps={{
             allowsFullscreenVideo: true,
-            allowsInlineMediaPlayback: false,
+            allowsInlineMediaPlayback: true,
             mediaPlaybackRequiresUserAction: false,
           }}
         />
