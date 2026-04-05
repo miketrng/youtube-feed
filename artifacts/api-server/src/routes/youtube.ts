@@ -105,7 +105,7 @@ router.get("/youtube/playlistItems", async (req, res) => {
       .filter((item: any) => {
         const vid = item.snippet?.resourceId?.videoId;
         const secs = durationMap[vid] ?? 0;
-        return secs > 60;
+        return secs > 180;
       })
       .slice(0, want);
 
