@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,17 +16,91 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useChannels } from "@/context/ChannelsContext";
 import { useColors } from "@/hooks/useColors";
 import { StoredChannel, resolveChannelFromUrl } from "@/services/youtube";
 
+const PASSCODE = "9999";
+
+function PasscodeGate({ onUnlock, colors }: { onUnlock: () => void; colors: ReturnType<typeof useColors> }) {
+  const [pin, setPin] = useState("");
+
+  const handleDigit = (d: string) => {
+    const next = pin + d;
+    setPin(next);
+    if (next.length === 4) {
+      if (next === PASSCODE) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onUnlock();
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setTimeout(() => setPin(""), 400);
+      }
+    }
+  };
+
+  const handleDelete = () => setPin((p) => p.slice(0, -1));
+  const digits = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+
+  return (
+    <SafeAreaView style={[pinStyles.container, { backgroundColor: colors.background }]}>
+      <Feather name="lock" size={32} color={colors.mutedForeground} style={{ marginBottom: 24 }} />
+      <Text style={[pinStyles.title, { color: colors.foreground }]}>Enter Passcode</Text>
+      <View style={pinStyles.dots}>
+        {[0,1,2,3].map((i) => (
+          <View
+            key={i}
+            style={[pinStyles.dot, { borderColor: colors.primary }, i < pin.length && { backgroundColor: colors.primary }]}
+          />
+        ))}
+      </View>
+      <View style={pinStyles.keypad}>
+        {digits.map((d, i) =>
+          d === "" ? (
+            <View key={i} style={pinStyles.keyEmpty} />
+          ) : d === "⌫" ? (
+            <Pressable
+              key={i}
+              onPress={handleDelete}
+              style={({ pressed }) => [pinStyles.key, { backgroundColor: pressed ? colors.muted : colors.card }]}
+            >
+              <Feather name="delete" size={20} color={colors.foreground} />
+            </Pressable>
+          ) : (
+            <Pressable
+              key={i}
+              onPress={() => handleDigit(d)}
+              style={({ pressed }) => [pinStyles.key, { backgroundColor: pressed ? colors.muted : colors.card }]}
+            >
+              <Text style={[pinStyles.keyText, { color: colors.foreground }]}>{d}</Text>
+            </Pressable>
+          )
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function SettingsScreen() {
   const colors = useColors();
   const { channels, addChannel, removeChannel, focusMode, toggleFocusMode } = useChannels();
+  const [unlocked, setUnlocked] = useState(false);
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => setUnlocked(false);
+    }, [])
+  );
+
+  if (!unlocked) {
+    return <PasscodeGate onUnlock={() => setUnlocked(true)} colors={colors} />;
+  }
 
   const handleAdd = async () => {
     const trimmed = url.trim();
@@ -54,8 +129,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-
   const handleRemove = async (channel: StoredChannel) => {
     await removeChannel(channel.id);
     setConfirmingId(null);
@@ -63,8 +136,9 @@ export default function SettingsScreen() {
   };
 
   return (
+    <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]}>
     <KeyboardAvoidingView
-      style={[styles.flex, { backgroundColor: colors.background }]}
+      style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
@@ -190,6 +264,7 @@ export default function SettingsScreen() {
         />
       </View>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -425,5 +500,51 @@ const styles = StyleSheet.create({
   focusSub: {
     fontSize: 12,
     lineHeight: 16,
+  },
+});
+
+const pinStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "600" as const,
+    marginBottom: 32,
+  },
+  dots: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 48,
+  },
+  dot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  keypad: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    width: 264,
+    gap: 12,
+  },
+  key: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keyEmpty: {
+    width: 80,
+    height: 80,
+  },
+  keyText: {
+    fontSize: 24,
+    fontWeight: "500" as const,
   },
 });

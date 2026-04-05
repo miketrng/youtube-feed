@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
@@ -25,7 +26,7 @@ export default function FeedScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <FlatList
           data={[1, 2, 3, 4]}
           keyExtractor={(item) => String(item)}
@@ -33,13 +34,13 @@ export default function FeedScreen() {
           contentContainerStyle={styles.list}
           scrollEnabled={false}
         />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (channels.length === 0) {
     return (
-      <View style={[styles.container, styles.empty, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, styles.empty, { backgroundColor: colors.background }]}>
         <View style={[styles.emptyIcon, { backgroundColor: colors.card }]}>
           <Feather name="youtube" size={40} color={colors.primary} />
         </View>
@@ -57,13 +58,13 @@ export default function FeedScreen() {
           <Feather name="plus" size={16} color="#fff" />
           <Text style={styles.emptyButtonText}>Add Channels</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (videos.length === 0) {
     return (
-      <View style={[styles.container, styles.empty, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, styles.empty, { backgroundColor: colors.background }]}>
         <Feather name="inbox" size={40} color={colors.mutedForeground} />
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
           No videos found
@@ -71,12 +72,12 @@ export default function FeedScreen() {
         <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>
           Pull down to refresh or add more channels in Settings.
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList<Video>
         data={videos}
         keyExtractor={(item) => item.id}
@@ -101,7 +102,7 @@ export default function FeedScreen() {
           />
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
