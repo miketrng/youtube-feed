@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
+import { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -85,6 +86,19 @@ export default function PlayerScreen() {
             allowsFullscreenVideo: true,
             allowsInlineMediaPlayback: true,
             mediaPlaybackRequiresUserAction: false,
+            onShouldStartLoadWithRequest: (request: ShouldStartLoadRequest) => {
+              const url = request.url;
+              // Block navigation to YouTube watch pages or app deep links
+              if (
+                url.includes("youtube.com/watch") ||
+                url.includes("youtu.be/") ||
+                url.startsWith("intent://") ||
+                url.startsWith("vnd.youtube://")
+              ) {
+                return false;
+              }
+              return true;
+            },
           }}
         />
       )}
