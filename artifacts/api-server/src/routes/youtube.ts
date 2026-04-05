@@ -20,6 +20,17 @@ async function ytFetch(endpoint: string, params: Record<string, string>) {
   return data;
 }
 
+/** Parse ISO 8601 duration (e.g. PT1M30S) into total seconds. */
+function parseDurationSeconds(iso: string): number {
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  return (
+    parseInt(m[1] ?? "0") * 3600 +
+    parseInt(m[2] ?? "0") * 60 +
+    parseInt(m[3] ?? "0")
+  );
+}
+
 // Proxy: channels lookup by ID
 router.get("/youtube/channels", async (req, res) => {
   try {
@@ -47,18 +58,61 @@ router.get("/youtube/search", async (req, res) => {
   }
 });
 
-// Proxy: playlist items (uploads) — supports pageToken for pagination
+// Proxy: playlist items (uploads) — filters out Shorts (≤60s), supports pagination
 router.get("/youtube/playlistItems", async (req, res) => {
   try {
-    const { playlistId, maxResults, part, pageToken } = req.query as Record<string, string>;
+    const { playlistId, maxResults, pageToken } = req.query as Record<string, string>;
+    const want = Math.min(parseInt(maxResults ?? "15"), 50);
+
+    // Fetch more than requested to account for Shorts being filtered out.
+    // YouTube API max per page is 50.
+    const fetchCount = Math.min(want * 2, 50);
+
     const params: Record<string, string> = {
-      part: part ?? "snippet",
+      part: "snippet",
       playlistId,
-      maxResults: maxResults ?? "15",
+      maxResults: String(fetchCount),
     };
     if (pageToken) params.pageToken = pageToken;
-    const data = await ytFetch("playlistItems", params);
-    res.json(data);
+
+    const playlistData = await ytFetch("playlistItems", params);
+    const items: any[] = playlistData.items ?? [];
+
+    if (items.length === 0) {
+      return res.json({ items: [], nextPageToken: playlistData.nextPageToken });
+    }
+
+    // Batch-fetch durations for all video IDs in one call
+    const videoIds = items
+      .map((item: any) => item.snippet?.resourceId?.videoId)
+      .filter(Boolean)
+      .join(",");
+
+    const videoData = await ytFetch("videos", {
+      part: "contentDetails",
+      id: videoIds,
+    });
+
+    // Build a duration map: videoId -> seconds
+    const durationMap: Record<string, number> = {};
+    for (const v of videoData.items ?? []) {
+      const dur = v.contentDetails?.duration ?? "";
+      durationMap[v.id] = parseDurationSeconds(dur);
+    }
+
+    // Filter out Shorts (≤ 60 seconds) then cap at the requested count
+    const filtered = items
+      .filter((item: any) => {
+        const vid = item.snippet?.resourceId?.videoId;
+        const secs = durationMap[vid] ?? 0;
+        return secs > 60;
+      })
+      .slice(0, want);
+
+    return res.json({
+      items: filtered,
+      nextPageToken: playlistData.nextPageToken,
+    });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
