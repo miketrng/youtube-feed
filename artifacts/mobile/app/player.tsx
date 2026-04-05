@@ -85,8 +85,9 @@ export default function PlayerScreen() {
       <div class="container">
         <iframe
           src="${embedUrl}"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
+          sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen allow-presentation"
         ></iframe>
       </div>
     </body>
@@ -150,6 +151,7 @@ export default function PlayerScreen() {
                 style={{ width: "100%", height: "100%", border: "none" }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen allow-presentation"
                 onLoad={() => setLoading(false)}
               />
             ) : (
