@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Curated YouTube",
+    "name": "AlexTime",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,9 +14,12 @@
       "backgroundColor": "#0f0f0f"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mk2021.alextime"
     },
-    "android": {},
+    "android": {
+      "package": "com.mk2021.alextime"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
